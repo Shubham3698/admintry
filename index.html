@@ -21,7 +21,7 @@
 </head>
 <body>
 
-<h2>📦 Admin Order Tracking Panel</h2>
+<h2>📦 Admin Order Tracking Panel (Live)</h2>
 
 <div class="top-bar">
   <div class="count">Total Orders: <span id="orderCount">0</span></div>
@@ -46,6 +46,9 @@
 </table>
 
 <script>
+// 🔥 UPDATED: Base URL for Render Backend
+const API_BASE_URL = "https://serdeptry1st.onrender.com/api/customer-orders";
+
 const statusOrder = ["Received","Processing","Shipped","Delivered","Cancelled"];
 
 function getTrackingHTML(order) {
@@ -70,9 +73,10 @@ async function fetchOrders() {
   tbody.innerHTML = "";
 
   try {
-    const res = await fetch("http://localhost:3000/api/customer-orders");
+    // 🔥 FIXED: Fetching from Render URL
+    const res = await fetch(API_BASE_URL);
     const result = await res.json();
-    const orders = result.orders || [];
+    const orders = result.data || result.orders || []; 
     countSpan.innerText = orders.length;
 
     orders.forEach((order, index) => {
@@ -101,7 +105,7 @@ async function fetchOrders() {
     loader.style.display = "none";
     table.style.display = "table";
   } catch (err) {
-    loader.innerText = "❌ Failed to load orders";
+    loader.innerText = "❌ Failed to load orders. Make sure backend is live on Render.";
     console.error(err);
   }
 }
@@ -111,7 +115,8 @@ async function updateStatus(orderId) {
   const newStatus = selectEl.value;
 
   try {
-    const res = await fetch(`http://localhost:3000/api/customer-orders/${orderId}`, {
+    // 🔥 FIXED: PATCH request to Render URL
+    const res = await fetch(`${API_BASE_URL}/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderStatus: newStatus })
@@ -121,11 +126,11 @@ async function updateStatus(orderId) {
       console.log(`Order ${orderId} status updated to ${newStatus}`);
       fetchOrders();
     } else {
-      alert("Failed to update status");
+      alert("Failed to update status: " + data.message);
     }
   } catch (err) {
     console.error("Error updating status:", err);
-    alert("Error updating status");
+    alert("Error updating status. Backend might be sleeping.");
   }
 }
 
