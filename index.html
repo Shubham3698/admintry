@@ -4,20 +4,24 @@
   <title>Admin Panel - Order Tracking</title>
   <meta charset="UTF-8" />
   <style>
-    body { font-family: Arial,sans-serif; background:#f4f6f9; padding:20px; }
-    h2 { text-align:center; margin-bottom:10px; }
-    .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
-    .refresh-btn, .search-btn { padding:8px 14px; background:#fe3d00; color:white; border:none; border-radius:6px; cursor:pointer; }
-    .refresh-btn:hover, .search-btn:hover { opacity:0.9; }
-    .count { font-weight:bold; }
-    .search-input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; flex-grow:1; min-width:200px; }
-    table { width:100%; border-collapse:collapse; background:white; margin-top:10px; }
-    th, td { padding:12px; border:1px solid #ddd; text-align:left; vertical-align:top; }
-    th { background:#000; color:white; }
-    tr:nth-child(even){ background:#f9f9f9; }
-    img.product-img { width:50px; height:50px; object-fit:cover; border-radius:4px; margin-right:10px; }
-    .loader { text-align:center; margin-top:20px; font-weight:bold; }
-    select.status-select { padding:4px 6px; border-radius:4px; border:1px solid #ccc; cursor:pointer; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f4f6f9; padding:20px; }
+    h2 { text-align:center; color: #333; margin-bottom:20px; }
+    .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .refresh-btn, .search-btn { padding:10px 18px; background:#fe3d00; color:white; border:none; border-radius:6px; cursor:pointer; font-weight: bold; }
+    .refresh-btn:hover, .search-btn:hover { background: #e03600; }
+    .count { font-weight:bold; font-size: 1.1rem; }
+    .search-input { padding:10px; border-radius:6px; border:1px solid #ccc; flex-grow:1; min-width:250px; }
+    table { width:100%; border-collapse:collapse; background:white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    th, td { padding:14px; border-bottom:1px solid #eee; text-align:left; vertical-align:top; }
+    th { background:#000; color:white; font-weight: 600; text-transform: uppercase; font-size: 0.85rem; }
+    tr:hover { background-color: #fcfcfc; }
+    img.product-img { width:45px; height:45px; object-fit:cover; border-radius:6px; margin-right:10px; border: 1px solid #ddd; }
+    .loader { text-align:center; margin-top:30px; font-weight:bold; color: #666; }
+    select.status-select { padding:6px 10px; border-radius:4px; border:1px solid #fe3d00; cursor:pointer; background: #fff; font-weight: 600; }
+    
+    /* Address Styling */
+    .address-box { font-size: 0.9rem; line-height: 1.4; color: #444; background: #fdfdfd; padding: 8px; border-radius: 4px; border-left: 3px solid #fe3d00; }
+    .address-name { font-weight: bold; color: #000; display: block; margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -26,35 +30,38 @@
 
 <div class="top-bar">
   <div class="count">Total Orders: <span id="orderCount">0</span></div>
-  <input type="text" id="searchInput" class="search-input" placeholder="Search by Order ID..." />
+  <input type="text" id="searchInput" class="search-input" placeholder="Search by Order ID or Name..." />
   <button class="search-btn" onclick="searchOrder()">🔍 Search</button>
   <button class="refresh-btn" onclick="fetchOrders()">🔄 Refresh</button>
 </div>
 
 <div class="loader" id="loader">Loading orders...</div>
 
-<table id="ordersTable" style="display:none;">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>Order ID</th>
-      <th>User Name</th>
-      <th>User Email</th>
-      <th>Products</th>
-      <th>Order Message</th>
-      <th>Date</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody id="ordersBody"></tbody>
-</table>
+<div style="overflow-x:auto;">
+  <table id="ordersTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Delivery Address</th>
+        <th>Products</th>
+        <th>Total</th>
+        <th>Date</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="ordersBody"></tbody>
+  </table>
+</div>
 
 <script>
-const API_BASE_URL = "https://serdeptry1st.onrender.com/api/customer-orders"; // ✅ Updated backend URL
-const statusOrder = ["Pending","Received","Processing","Shipped","Delivered","Cancelled"];
-let allOrders = []; // Store all orders for search
+// 🔥 UPDATED: Render Backend URL for Deployment
+const API_BASE_URL = "https://serdeptry1st.onrender.com/api/customer-orders"; 
 
-// Generates the status dropdown
+const statusOrder = ["Pending","Received","Processing","Shipped","Delivered","Cancelled"];
+let allOrders = [];
+
 function getStatusDropdown(order) {
   const selectId = "status-" + order._id;
   return `
@@ -66,7 +73,6 @@ function getStatusDropdown(order) {
   `;
 }
 
-// Render orders in table
 function renderOrders(orders) {
   const tbody = document.getElementById("ordersBody");
   const countSpan = document.getElementById("orderCount");
@@ -74,31 +80,47 @@ function renderOrders(orders) {
   countSpan.innerText = orders.length;
 
   orders.forEach((order, index) => {
+    // Products Logic
     const productsHTML = order.products.map(p => `
-      <div style="display:flex; align-items:center; margin-bottom:5px;">
+      <div style="display:flex; align-items:center; margin-bottom:8px;">
         <img class="product-img" src="${p.image}" alt="${p.title}" />
-        <span>${p.title} x${p.quantity} - ₹${p.price}</span>
+        <span style="font-size:0.85rem;"><strong>${p.quantity}x</strong> ${p.title}</span>
       </div>
     `).join('');
+
+    // Address Logic (Handling nested object)
+    let addressHTML = `<span style="color:red; font-style:italic;">No Address</span>`;
+    if (order.address) {
+      addressHTML = `
+        <div class="address-box">
+          <span class="address-name">${order.address.fullName || order.userName}</span>
+          📞 ${order.address.phone}<br>
+          📍 ${order.address.street}, ${order.address.city}<br>
+          ${order.address.state} - ${order.address.pincode}
+        </div>
+      `;
+    }
 
     const statusHTML = getStatusDropdown(order);
 
     tbody.innerHTML += `
       <tr>
         <td>${index + 1}</td>
-        <td>${order.shortOrderId || order._id}</td>
-        <td>${order.userName || "Unknown"}</td>
-        <td>${order.userEmail || "unknown@example.com"}</td>
+        <td style="font-weight:bold; color:#fe3d00;">${order.shortOrderId || 'N/A'}</td>
+        <td>
+            <strong>${order.userName}</strong><br>
+            <small style="color:#666;">${order.userEmail}</small>
+        </td>
+        <td>${addressHTML}</td>
         <td>${productsHTML}</td>
-        <td>${order.message ? order.message.replace(/\n/g, "<br>") : ""}</td>
-        <td>${new Date(order.createdAt).toLocaleString()}</td>
+        <td style="font-weight:bold;">₹${order.total}</td>
+        <td><small>${new Date(order.createdAt).toLocaleString('en-IN')}</small></td>
         <td>${statusHTML}</td>
       </tr>
     `;
   });
 }
 
-// Fetch all orders
 async function fetchOrders() {
   const loader = document.getElementById("loader");
   const table = document.getElementById("ordersTable");
@@ -108,32 +130,32 @@ async function fetchOrders() {
   try {
     const res = await fetch(API_BASE_URL);
     const result = await res.json();
-    allOrders = result.orders || [];
+    // Apne backend response structure ke hisab se orders nikalna
+    allOrders = result.orders || result.data || []; 
     renderOrders(allOrders);
 
     loader.style.display = "none";
     table.style.display = "table";
   } catch (err) {
-    loader.innerText = "❌ Failed to load orders. Make sure backend is running.";
+    loader.innerHTML = `❌ Failed to load orders. <br> <small>Check if backend is running on Render.</small>`;
     console.error(err);
   }
 }
 
-// Search order by shortOrderId / _id
 function searchOrder() {
   const searchValue = document.getElementById("searchInput").value.trim().toLowerCase();
   if (!searchValue) {
-    renderOrders(allOrders); // show all if empty
+    renderOrders(allOrders);
     return;
   }
   const filteredOrders = allOrders.filter(order =>
     (order.shortOrderId && order.shortOrderId.toLowerCase().includes(searchValue)) ||
-    order._id.toLowerCase().includes(searchValue)
+    (order.userName && order.userName.toLowerCase().includes(searchValue)) ||
+    (order.userEmail && order.userEmail.toLowerCase().includes(searchValue))
   );
   renderOrders(filteredOrders);
 }
 
-// Update order status
 async function updateStatus(orderId) {
   const selectEl = document.getElementById("status-" + orderId);
   const newStatus = selectEl.value;
@@ -146,18 +168,17 @@ async function updateStatus(orderId) {
     });
     const data = await res.json();
     if (data.success) {
-      console.log(`Order ${orderId} status updated to ${newStatus}`);
-      fetchOrders();
+      alert("✅ Status Updated!");
     } else {
-      alert("Failed to update status: " + data.message);
+      alert("❌ Failed: " + data.message);
     }
   } catch (err) {
     console.error("Error updating status:", err);
-    alert("Error updating status. Backend might not be running.");
+    alert("Error: Server not responding.");
   }
 }
 
-// Initial fetch (only on page load)
+// Start
 fetchOrders();
 </script>
 
