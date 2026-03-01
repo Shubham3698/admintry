@@ -6,11 +6,12 @@
   <style>
     body { font-family: Arial,sans-serif; background:#f4f6f9; padding:20px; }
     h2 { text-align:center; margin-bottom:10px; }
-    .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
-    .refresh-btn { padding:8px 14px; background:#fe3d00; color:white; border:none; border-radius:6px; cursor:pointer; }
-    .refresh-btn:hover { opacity:0.9; }
+    .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+    .refresh-btn, .search-btn { padding:8px 14px; background:#fe3d00; color:white; border:none; border-radius:6px; cursor:pointer; }
+    .refresh-btn:hover, .search-btn:hover { opacity:0.9; }
     .count { font-weight:bold; }
-    table { width:100%; border-collapse:collapse; background:white; }
+    .search-input { padding:6px 10px; border-radius:6px; border:1px solid #ccc; flex-grow:1; min-width:200px; }
+    table { width:100%; border-collapse:collapse; background:white; margin-top:10px; }
     th, td { padding:12px; border:1px solid #ddd; text-align:left; vertical-align:top; }
     th { background:#000; color:white; }
     tr:nth-child(even){ background:#f9f9f9; }
@@ -25,6 +26,8 @@
 
 <div class="top-bar">
   <div class="count">Total Orders: <span id="orderCount">0</span></div>
+  <input type="text" id="searchInput" class="search-input" placeholder="Search by Order ID..." />
+  <button class="search-btn" onclick="searchOrder()">🔍 Search</button>
   <button class="refresh-btn" onclick="fetchOrders()">🔄 Refresh</button>
 </div>
 
@@ -34,6 +37,7 @@
   <thead>
     <tr>
       <th>#</th>
+      <th>Order ID</th>
       <th>User Name</th>
       <th>User Email</th>
       <th>Products</th>
@@ -46,12 +50,12 @@
 </table>
 
 <script>
-// 🔥 UPDATED: Base URL for Render Backend
-const API_BASE_URL = "https://serdeptry1st.onrender.com/api/customer-orders";
+const API_BASE_URL = "https://serdeptry1st.onrender.com/api/customer-orders"; // ✅ Updated backend URL
+const statusOrder = ["Pending","Received","Processing","Shipped","Delivered","Cancelled"];
+let allOrders = []; // Store all orders for search
 
-const statusOrder = ["Received","Processing","Shipped","Delivered","Cancelled"];
-
-function getTrackingHTML(order) {
+// Generates the status dropdown
+function getStatusDropdown(order) {
   const selectId = "status-" + order._id;
   return `
     <select class="status-select" id="${selectId}" onchange="updateStatus('${order._id}')">
@@ -62,60 +66,79 @@ function getTrackingHTML(order) {
   `;
 }
 
+// Render orders in table
+function renderOrders(orders) {
+  const tbody = document.getElementById("ordersBody");
+  const countSpan = document.getElementById("orderCount");
+  tbody.innerHTML = "";
+  countSpan.innerText = orders.length;
+
+  orders.forEach((order, index) => {
+    const productsHTML = order.products.map(p => `
+      <div style="display:flex; align-items:center; margin-bottom:5px;">
+        <img class="product-img" src="${p.image}" alt="${p.title}" />
+        <span>${p.title} x${p.quantity} - ₹${p.price}</span>
+      </div>
+    `).join('');
+
+    const statusHTML = getStatusDropdown(order);
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${order.shortOrderId || order._id}</td>
+        <td>${order.userName || "Unknown"}</td>
+        <td>${order.userEmail || "unknown@example.com"}</td>
+        <td>${productsHTML}</td>
+        <td>${order.message ? order.message.replace(/\n/g, "<br>") : ""}</td>
+        <td>${new Date(order.createdAt).toLocaleString()}</td>
+        <td>${statusHTML}</td>
+      </tr>
+    `;
+  });
+}
+
+// Fetch all orders
 async function fetchOrders() {
   const loader = document.getElementById("loader");
   const table = document.getElementById("ordersTable");
-  const tbody = document.getElementById("ordersBody");
-  const countSpan = document.getElementById("orderCount");
-
   loader.style.display = "block";
   table.style.display = "none";
-  tbody.innerHTML = "";
 
   try {
-    // 🔥 FIXED: Fetching from Render URL
     const res = await fetch(API_BASE_URL);
     const result = await res.json();
-    const orders = result.data || result.orders || []; 
-    countSpan.innerText = orders.length;
-
-    orders.forEach((order, index) => {
-      const productsHTML = order.products.map(p => `
-        <div style="display:flex; align-items:center; margin-bottom:5px;">
-          <img class="product-img" src="${p.image}" alt="${p.title}" />
-          <span>${p.title} x${p.quantity} - ₹${p.price}</span>
-        </div>
-      `).join('');
-
-      const statusHTML = getTrackingHTML(order);
-
-      tbody.innerHTML += `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${order.userName || "Unknown User"}</td>
-          <td>${order.userEmail || "unknown@example.com"}</td>
-          <td>${productsHTML}</td>
-          <td>${order.message ? order.message.replace(/\n/g, "<br>") : ''}</td>
-          <td>${new Date(order.createdAt).toLocaleString()}</td>
-          <td>${statusHTML}</td>
-        </tr>
-      `;
-    });
+    allOrders = result.orders || [];
+    renderOrders(allOrders);
 
     loader.style.display = "none";
     table.style.display = "table";
   } catch (err) {
-    loader.innerText = "❌ Failed to load orders. Make sure backend is live on Render.";
+    loader.innerText = "❌ Failed to load orders. Make sure backend is running.";
     console.error(err);
   }
 }
 
+// Search order by shortOrderId / _id
+function searchOrder() {
+  const searchValue = document.getElementById("searchInput").value.trim().toLowerCase();
+  if (!searchValue) {
+    renderOrders(allOrders); // show all if empty
+    return;
+  }
+  const filteredOrders = allOrders.filter(order =>
+    (order.shortOrderId && order.shortOrderId.toLowerCase().includes(searchValue)) ||
+    order._id.toLowerCase().includes(searchValue)
+  );
+  renderOrders(filteredOrders);
+}
+
+// Update order status
 async function updateStatus(orderId) {
   const selectEl = document.getElementById("status-" + orderId);
   const newStatus = selectEl.value;
 
   try {
-    // 🔥 FIXED: PATCH request to Render URL
     const res = await fetch(`${API_BASE_URL}/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -130,15 +153,12 @@ async function updateStatus(orderId) {
     }
   } catch (err) {
     console.error("Error updating status:", err);
-    alert("Error updating status. Backend might be sleeping.");
+    alert("Error updating status. Backend might not be running.");
   }
 }
 
-// Initial fetch
+// Initial fetch (only on page load)
 fetchOrders();
-
-// Auto-refresh every 30s
-setInterval(fetchOrders, 30000);
 </script>
 
 </body>
