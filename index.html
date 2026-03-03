@@ -17,16 +17,33 @@
     tr:hover { background-color: #fcfcfc; }
     img.product-img { width:45px; height:45px; object-fit:cover; border-radius:6px; margin-right:10px; border: 1px solid #ddd; }
     .loader { text-align:center; margin-top:30px; font-weight:bold; color: #666; }
-    select.status-select { padding:6px 10px; border-radius:4px; border:1px solid #fe3d00; cursor:pointer; background: #fff; font-weight: 600; }
+    
+    /* Status Select Styling */
+    select.status-select { padding:6px 10px; border-radius:4px; border:1px solid #fe3d00; cursor:pointer; background: #fff; font-weight: 600; outline: none; }
     
     /* Address Styling */
     .address-box { font-size: 0.9rem; line-height: 1.4; color: #444; background: #fdfdfd; padding: 8px; border-radius: 4px; border-left: 3px solid #fe3d00; }
     .address-name { font-weight: bold; color: #000; display: block; margin-bottom: 2px; }
+
+    /* Cancellation Query Box */
+    .query-box { 
+      font-size: 0.85rem; 
+      padding: 10px; 
+      border-radius: 8px; 
+      background: #fff5f5; 
+      border: 1px solid #feb2b2; 
+      color: #c53030;
+      max-width: 220px;
+      word-wrap: break-word;
+      box-shadow: 0 2px 4px rgba(197, 48, 48, 0.05);
+    }
+    .reason-label { font-weight: 800; text-transform: uppercase; font-size: 0.7rem; display: block; margin-bottom: 4px; color: #e53e3e; }
+    .no-query { color: #aaa; font-style: italic; font-size: 0.85rem; }
   </style>
 </head>
 <body>
 
-<h2>📦 Admin Order Tracking Panel (Live)</h2>
+<h2>📦 Admin Order Tracking Panel (Localhost:3000)</h2>
 
 <div class="top-bar">
   <div class="count">Total Orders: <span id="orderCount">0</span></div>
@@ -49,6 +66,7 @@
         <th>Total</th>
         <th>Date</th>
         <th>Status</th>
+        <th>Cancellation Request</th>
       </tr>
     </thead>
     <tbody id="ordersBody"></tbody>
@@ -56,7 +74,7 @@
 </div>
 
 <script>
-// 🔥 UPDATED: Render Backend URL for Deployment
+// 🛠️ LOCAL TESTING: localhost:3000 use ho raha hai
 const API_BASE_URL = "https://serdeptry1st.onrender.com/api/customer-orders"; 
 
 const statusOrder = ["Pending","Received","Processing","Shipped","Delivered","Cancelled"];
@@ -80,7 +98,7 @@ function renderOrders(orders) {
   countSpan.innerText = orders.length;
 
   orders.forEach((order, index) => {
-    // Products Logic
+    // Products UI
     const productsHTML = order.products.map(p => `
       <div style="display:flex; align-items:center; margin-bottom:8px;">
         <img class="product-img" src="${p.image}" alt="${p.title}" />
@@ -88,7 +106,7 @@ function renderOrders(orders) {
       </div>
     `).join('');
 
-    // Address Logic (Handling nested object)
+    // Address UI
     let addressHTML = `<span style="color:red; font-style:italic;">No Address</span>`;
     if (order.address) {
       addressHTML = `
@@ -100,6 +118,12 @@ function renderOrders(orders) {
         </div>
       `;
     }
+
+    // Cancellation Reason Logic
+    const reasonText = order.cancelReason || order.reason || ""; 
+    const queryHTML = reasonText 
+      ? `<div class="query-box"><span class="reason-label">User Requested:</span>${reasonText}</div>`
+      : `<span class="no-query">No active requests</span>`;
 
     const statusHTML = getStatusDropdown(order);
 
@@ -116,6 +140,7 @@ function renderOrders(orders) {
         <td style="font-weight:bold;">₹${order.total}</td>
         <td><small>${new Date(order.createdAt).toLocaleString('en-IN')}</small></td>
         <td>${statusHTML}</td>
+        <td>${queryHTML}</td>
       </tr>
     `;
   });
@@ -130,14 +155,13 @@ async function fetchOrders() {
   try {
     const res = await fetch(API_BASE_URL);
     const result = await res.json();
-    // Apne backend response structure ke hisab se orders nikalna
     allOrders = result.orders || result.data || []; 
     renderOrders(allOrders);
 
     loader.style.display = "none";
     table.style.display = "table";
   } catch (err) {
-    loader.innerHTML = `❌ Failed to load orders. <br> <small>Check if backend is running on Render.</small>`;
+    loader.innerHTML = `❌ Failed to load orders. <br> <small>Server status check karein (Port 3000).</small>`;
     console.error(err);
   }
 }
@@ -168,7 +192,8 @@ async function updateStatus(orderId) {
     });
     const data = await res.json();
     if (data.success) {
-      alert("✅ Status Updated!");
+      alert("✅ Order status updated to: " + newStatus);
+      // Status update ke baad table refresh nahi hogi, sirf alert aayega
     } else {
       alert("❌ Failed: " + data.message);
     }
@@ -178,7 +203,6 @@ async function updateStatus(orderId) {
   }
 }
 
-// Start
 fetchOrders();
 </script>
 
